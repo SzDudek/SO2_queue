@@ -21,19 +21,21 @@ Client::Client(int speed, char letter) : speed(speed), letter(letter), position(
 }
 
 void Client::moveClient() {
-    while (position != direction || running) {
-        if (position.getY() != direction.getY()) {
-            if (position.getY() < direction.getY())
-                position.setY(position.getY() + 1);
-            else if (position.getY() > direction.getY())
-                position.setY(position.getY() - 1);
-        } else {
-            if (position.getX() < direction.getX())
-                position.setX(position.getX() + 1);
-            else
-                position.setX(position.getX() - 1);
+    while (running) {
+        if(position != direction){
+            if (position.getY() != direction.getY()) {
+                if (position.getY() < direction.getY())
+                    position.setY(position.getY() + 1);
+                else if (position.getY() > direction.getY())
+                    position.setY(position.getY() - 1);
+            } else {
+                if (position.getX() < direction.getX())
+                    position.setX(position.getX() + 1);
+                else
+                    position.setX(position.getX() - 1);
+            }
         }
-        if(position == direction && finalDirection) {
+        else if(finalDirection) {
             running = false;
             std::this_thread::sleep_for(std::chrono::seconds(2));
             toErase = true;
