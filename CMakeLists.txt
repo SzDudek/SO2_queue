@@ -12,8 +12,7 @@ add_executable(SO2_queue main.cpp
         Structures/Station.h
         Structures/Client.cpp
         Structures/Client.h
-        Structures/Director.cpp
-        Structures/Director.h
-        Structures/Station.cpp)
+        Structures/Station.cpp
+        Structures/globals.h)
 
 target_link_libraries(SO2_queue ${CURSES_LIBRARIES})

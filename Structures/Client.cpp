@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <ncurses.h>
 #include "Client.h"
+#include "globals.h"
 
 Client::Client(int speed, char letter, const Coordinates &direction) :
         speed(speed),
@@ -39,6 +40,10 @@ void Client::moveClient() {
             running = false;
             std::this_thread::sleep_for(std::chrono::seconds(2));
             toErase = true;
+        }
+        else{
+            finalDirection = true;
+            direction = stations[targetedStation].getPos();
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000 / speed));
     }

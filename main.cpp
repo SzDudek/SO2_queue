@@ -2,8 +2,6 @@
 #include <ncurses.h>
 #include "Structures/Client.h"
 #include "Structures/Station.h"
-#include "Structures/Director.h"
-#include <unistd.h>
 #include <vector>
 #include <random>
 #include <memory>
@@ -11,38 +9,65 @@
 
 std::vector<Station> stations{{0,{60,5}},{1,{60,10}},{2,{60,15}}};
 std::vector<std::shared_ptr<Client*>> clients;
-Director director(0, {30, 10});
-bool volatile generate = true;
+int directorX = 30;
+int directorY = 10;
+bool generate = true;
+int targetedStation = 0;
+bool direct = true;
+
+std::mutex vectorMutex;
+
+void changeTarget() {
+    while(direct){
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        if(targetedStation!=2) targetedStation+=1;
+        else targetedStation = 0;
+    }
+}
+
+void drawDirector(){
+    switch (targetedStation) {
+        case 0:
+            mvaddch(directorY,directorX,ACS_UARROW);
+            break;
+        case 1:
+            mvaddch(directorY,directorX,ACS_RARROW);
+            break;
+        case 2:
+            mvaddch(directorY,directorX,ACS_DARROW);
+            break;
+    }
+}
 
 void drawCorridor(){
-    for(int i = 9; i<director.getXPos()-1; ++i) {
-        mvaddch(director.getYPos()-1, i, '-');
-        mvaddch(director.getYPos()+1, i, '-');
+    for(int i = 9; i<directorX-1; ++i) {
+        mvaddch(directorY-1, i, '-');
+        mvaddch(directorY+1, i, '-');
     }
 
     for(int i = 0; i<4;++i){
-        mvaddch(director.getYPos()+i+2,director.getXPos()-2,'|');
-        mvaddch(director.getYPos()-i-2,director.getXPos()-2,'|');
+        mvaddch(directorY+i+2,directorX-2,'|');
+        mvaddch(directorY-i-2,directorX-2,'|');
     }
 
-    for(int i = 0; i<stations[0].getXPos() - director.getXPos(); ++i){
-        mvaddch(director.getYPos()-1,director.getXPos()+2+i,'-');
-        mvaddch(director.getYPos()+1,director.getXPos()+2+i,'-');
+    for(int i = 0; i<stations[0].getXPos() - directorX; ++i){
+        mvaddch(directorY-1,directorX+2+i,'-');
+        mvaddch(directorY+1,directorX+2+i,'-');
     }
 
     for(int i = 0;i<3;++i){
-        mvaddch(director.getYPos()-2-i,director.getXPos()+2,'|');
-        mvaddch(director.getYPos()+2+i,director.getXPos()+2,'|');
+        mvaddch(directorY-2-i,directorX+2,'|');
+        mvaddch(directorY+2+i,directorX+2,'|');
     }
 
-    for(int i = 0 ; i<stations[0].getXPos() - director.getXPos(); ++i){
-        mvaddch(director.getYPos()-4,director.getXPos()+2+i,'-');
-        mvaddch(director.getYPos()+4,director.getXPos()+2+i,'-');
+    for(int i = 0 ; i<stations[0].getXPos() - directorX; ++i){
+        mvaddch(directorY-4,directorX+2+i,'-');
+        mvaddch(directorY+4,directorX+2+i,'-');
     }
 
-    for(int i = 0 ; i<stations[0].getXPos() - director.getXPos()+3; ++i){
-        mvaddch(director.getYPos()-6,director.getXPos()-1+i,'-');
-        mvaddch(director.getYPos()+6,director.getXPos()-1+i,'-');
+    for(int i = 0 ; i<stations[0].getXPos() - directorX+3; ++i){
+        mvaddch(directorY-6,directorX-1+i,'-');
+        mvaddch(directorY+6,directorX-1+i,'-');
     }
 }
 
@@ -57,7 +82,7 @@ void  generateClients(){
     while(generate){
         letter = 'A' + distr_letter(gen);
         speed = 1 + distr_speed(gen);
-        auto newClient = std::make_shared<Client*>(new Client{speed,letter,{director.getXPos(),director.getYPos()}});
+        auto newClient = std::make_shared<Client*>(new Client{speed,letter,{directorX,directorY}});
         clients.emplace_back(newClient);
         std::this_thread::sleep_for(std::chrono::seconds(1*distr_sleep(gen)));
     }
@@ -73,7 +98,8 @@ int main() {
     curs_set(0);
     nodelay(stdscr, TRUE);
 
-    std::thread clientGenerator(&generateClients);
+    std::thread clientGenerator(generateClients);
+    std::thread director(changeTarget);
 
     while(true){
         erase();
@@ -82,18 +108,13 @@ int main() {
             (*client)->draw();
         }
 
-        director.draw();
+        drawDirector();
 
         refresh();
 
         bool erased = false;
 
         for(auto client = clients.begin();client!=clients.end();){
-            if((*(*client))->getPos() == director.getPos()){
-                (*(*client))->setDirection(stations[director.getTarget()].getPos());
-                ++client;
-                continue;
-            }
             erased = false;
             for(auto& station : stations){
                 if((*(*client))->getPos() == station.getPos() && (*(*client))->getToErase()){
@@ -108,12 +129,14 @@ int main() {
         if(ch == ' ') {
             generate = false;
             clientGenerator.join();
-            director.stop();
+            direct = false;
+            director.join();
             for(auto& client : clients) {
                 (*client)->joinThread();
             }
             break;
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     endwin();
 
