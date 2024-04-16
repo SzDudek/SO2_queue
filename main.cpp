@@ -83,6 +83,7 @@ void  generateClients(){
         letter = 'A' + distr_letter(gen);
         speed = 1 + distr_speed(gen);
         auto newClient = std::make_shared<Client*>(new Client{speed,letter,{directorX,directorY}});
+        std::lock_guard<std::mutex> lock(vectorMutex);
         clients.emplace_back(newClient);
         std::this_thread::sleep_for(std::chrono::seconds(1*distr_sleep(gen)));
     }
@@ -118,6 +119,7 @@ int main() {
             erased = false;
             for(auto& station : stations){
                 if((*(*client))->getPos() == station.getPos() && (*(*client))->getToErase()){
+                    std::lock_guard<std::mutex> lock(vectorMutex);
                     client = clients.erase(client);
                     erased = true;
                     break;
