@@ -8,21 +8,25 @@
 
 #include <cstdlib>
 #include <thread>
+#include <condition_variable>
 #include "Coordinates.h"
 
 class Client {
     bool volatile running;
     bool volatile finalDirection;
     bool volatile toErase;
+    bool directed;
     const int speed;
+    const int destIndex;
     const char letter;
     Coordinates position;
-    Coordinates direction;
+    const Coordinates director;
+    const Coordinates destination;
     std::thread threadId;
 public:
-    Client(int speed, char letter, const Coordinates &direction);
+    Client(int speed, char letter, const Coordinates &director, const Coordinates &destination, const int &destIndex);
 
-    Client(int speed, char letter);
+    Client(int speed, char letter, const Coordinates &destination, const int &destIndex);
 
     void moveClient();
 
@@ -36,7 +40,7 @@ public:
 
     Coordinates getPos() const;
 
-    void setDirection(Coordinates newDirection);
+//    void setDirection(const Coordinates& newDirection);
 
     void draw() const;
 };

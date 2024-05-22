@@ -16,12 +16,18 @@ int targetedStation = 0;
 bool direct = true;
 
 std::mutex vectorMutex;
+std::mutex directorMutex;
+std::condition_variable directorCV;
 
 void changeTarget() {
     while(direct){
         std::this_thread::sleep_for(std::chrono::seconds(3));
-        if(targetedStation!=2) targetedStation+=1;
-        else targetedStation = 0;
+        {
+            std::lock_guard<std::mutex> lock(directorMutex);
+            if(targetedStation!=2) targetedStation+=1;
+            else targetedStation = 0;
+        }
+        directorCV.notify_all();
     }
 }
 
@@ -74,17 +80,29 @@ void drawCorridor(){
 void  generateClients(){
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> distr_letter(0,26);
     std::uniform_int_distribution<> distr_speed(0,4);
     std::uniform_int_distribution<> distr_sleep(1,3);
+    std::uniform_int_distribution<> dest_index(0,2);
     char letter;
-    int speed;
+    int speed, dest;
     while(generate){
-        letter = 'A' + distr_letter(gen);
         speed = 1 + distr_speed(gen);
-        auto newClient = std::make_shared<Client*>(new Client{speed,letter,{directorX,directorY}});
-        std::lock_guard<std::mutex> lock(vectorMutex);
+        dest = dest_index(gen);
+        switch (dest) {
+            case 0:
+                letter = '0';
+                break;
+            case 1:
+                letter = '1';
+                break;
+            case 2:
+                letter = '2';
+                break;
+        }
+        auto newClient = std::make_shared<Client*>(new Client{speed,letter,{directorX,directorY},stations[dest].getPos(),dest});
+        vectorMutex.lock();
         clients.emplace_back(newClient);
+        vectorMutex.unlock();
         std::this_thread::sleep_for(std::chrono::seconds(1*distr_sleep(gen)));
     }
 }
@@ -92,8 +110,8 @@ void  generateClients(){
 
 int main() {
 
-    auto testCLient = std::make_shared<Client*>( new Client(3,'T'));
-    clients.emplace_back(testCLient);
+//    auto testCLient = std::make_shared<Client*>( new Client(3,'T'));
+//    clients.emplace_back(testCLient);
 
     initscr();
     curs_set(0);
@@ -119,8 +137,9 @@ int main() {
             erased = false;
             for(auto& station : stations){
                 if((*(*client))->getPos() == station.getPos() && (*(*client))->getToErase()){
-                    std::lock_guard<std::mutex> lock(vectorMutex);
+                    vectorMutex.lock();
                     client = clients.erase(client);
+                    vectorMutex.unlock();
                     erased = true;
                     break;
                 }
