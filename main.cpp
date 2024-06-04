@@ -6,6 +6,8 @@
 #include <random>
 #include <memory>
 #include <thread>
+#include <queue>
+#include <chrono>
 
 std::vector<Station> stations{{0,{60,5}},{1,{60,10}},{2,{60,15}}};
 std::vector<std::shared_ptr<Client*>> clients;
@@ -18,10 +20,28 @@ bool direct = true;
 std::mutex vectorMutex;
 std::mutex directorMutex;
 std::condition_variable directorCV;
+std::queue<Client*> queues[3]; // Queues for each direction
 
 void changeTarget() {
     while(direct){
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        auto start = std::chrono::steady_clock::now();
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
+            if (elapsed >= 3) break;
+
+            {
+                std::unique_lock<std::mutex> lock(directorMutex);
+                if (!queues[targetedStation].empty()) {
+                    Client* client = queues[targetedStation].front();
+                    queues[targetedStation].pop();
+                    client->directed = true;
+                    directorCV.notify_all();
+                }
+            }
+        }
+
         {
             std::lock_guard<std::mutex> lock(directorMutex);
             if(targetedStation!=2) targetedStation+=1;
@@ -77,7 +97,7 @@ void drawCorridor(){
     }
 }
 
-void  generateClients(){
+void generateClients(){
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distr_speed(0,4);
@@ -88,6 +108,7 @@ void  generateClients(){
     while(generate){
         speed = 1 + distr_speed(gen);
         dest = dest_index(gen);
+        //dest = 1;
         switch (dest) {
             case 0:
                 letter = '0';
@@ -107,11 +128,7 @@ void  generateClients(){
     }
 }
 
-
 int main() {
-
-//    auto testCLient = std::make_shared<Client*>( new Client(3,'T'));
-//    clients.emplace_back(testCLient);
 
     initscr();
     curs_set(0);
@@ -146,20 +163,23 @@ int main() {
             }
             if(!erased) ++client;
         }
+
         int ch = getch();
         if(ch == ' ') {
+            endwin();
             generate = false;
-            clientGenerator.join();
             direct = false;
+            clientGenerator.join();
             director.join();
+            std::cout << clients.size() << std::endl;
             for(auto& client : clients) {
                 (*client)->joinThread();
             }
+            directorCV.notify_all();
             break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    endwin();
 
     return 0;
 }

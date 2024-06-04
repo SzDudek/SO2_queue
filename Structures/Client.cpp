@@ -1,14 +1,13 @@
-//
-// Created by sdudek on 29.03.24.
-//
 #include <unistd.h>
 #include <ncurses.h>
 #include <vector>
+#include <queue>
 #include "Client.h"
 #include "Station.h"
 
 extern std::mutex directorMutex;
 extern std::condition_variable directorCV;
+extern std::queue<Client*> queues[3];
 
 extern std::vector<Station> stations;
 extern int directorX;
@@ -47,11 +46,6 @@ Client::Client(int speed, char letter, const Coordinates &destination, const int
 void Client::moveClient() {
     while (running) {
         if(finalDirection){
-            if(!directed){
-                std::unique_lock<std::mutex> lock(directorMutex);
-                directorCV.wait(lock, [this]{return (targetedStation == destIndex) || !running;});
-                directed = true;
-            }
             if (position != destination) {
                 if (position.getY() != destination.getY()) {
                     if (position.getY() < destination.getY())
@@ -86,6 +80,15 @@ void Client::moveClient() {
                 }
             }
             else{
+                // Queue up at the director
+                {
+                    std::unique_lock<std::mutex> lock(directorMutex);
+                    queues[destIndex].push(this);
+                }
+                // Wait until directed
+                std::unique_lock<std::mutex> lock(directorMutex);
+                directorCV.wait(lock, [this]{return directed || !running;});
+                if (!running) break;
                 finalDirection = true;
             }
         }
@@ -95,6 +98,7 @@ void Client::moveClient() {
 
 void Client::joinThread() {
     running = false;
+    directorCV.notify_all();
     threadId.join();
 }
 
@@ -110,12 +114,6 @@ Coordinates Client::getPos() const {
     return position;
 }
 
-//void Client::setDirection(const Coordinates &newDestination) {
-//    finalDirection = true;
-//    destination.setX(newDestination.getX());
-//    destination.setY(newDestination.getY());
-//}
-
 void Client::draw() const {
     mvaddch(position.getY(), position.getX(), letter);
 }
@@ -123,5 +121,3 @@ void Client::draw() const {
 bool Client::getToErase() const {
     return toErase;
 }
-
-

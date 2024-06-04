@@ -1,7 +1,3 @@
-//
-// Created by sdudek on 29.03.24.
-//
-
 #ifndef SO2_QUEUE_CLIENT_H
 #define SO2_QUEUE_CLIENT_H
 
@@ -15,7 +11,6 @@ class Client {
     bool volatile running;
     bool volatile finalDirection;
     bool volatile toErase;
-    bool directed;
     const int speed;
     const int destIndex;
     const char letter;
@@ -40,9 +35,9 @@ public:
 
     Coordinates getPos() const;
 
-//    void setDirection(const Coordinates& newDirection);
-
     void draw() const;
+
+    bool directed;
 };
 
 
